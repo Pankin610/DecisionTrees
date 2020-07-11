@@ -4,9 +4,6 @@ import random
 
 class DecisionTree:
     _description = 'A universal Decision Tree, accounting for all types of data and predictions.'
-
-    def _seed(self):
-        return self.seed
     
     @property
     def description(self):
@@ -158,7 +155,7 @@ class DecisionTree:
             column_types = DecisionTree._get_column_types(data)
 
         order = list(data.index)
-        random.shuffle(order, self._seed)
+        np.random.shuffle(order)
 
         block_size = len(data) // splits
 
@@ -199,7 +196,7 @@ class DecisionTree:
 
 class RandomForest(DecisionTree):
     def __init__(self, max_deapth = 30, min_gain = -0.00001, min_node_examples = 1, max_node_examples = 1000000000,
-                 feature_subset_volume = 1000000000, question_count = 50, seed = 610, tree_count = 5):
+                 feature_subset_volume = 1000000000, question_count = 50, seed = 610, tree_count = 5, drop_data = 0):
 
         self.max_node_examples = max_node_examples
         self.max_deapth = max_deapth
@@ -209,6 +206,7 @@ class RandomForest(DecisionTree):
         self.min_node_examples = min_node_examples
         self.feature_subset_volume = feature_subset_volume
         self.tree_count = tree_count
+        self.drop_data = drop_data
         random.seed(seed)
         np.random.seed(seed)
 
@@ -216,7 +214,12 @@ class RandomForest(DecisionTree):
         self.forest = [DecisionTree(max_deapth=self.max_deapth, min_gain=self.min_gain, min_node_examples=self.min_node_examples, max_node_examples=self.max_node_examples,
                                     feature_subset_volume=self.feature_subset_volume, question_count = self.question_count, seed=self.seed) for i in range(self.tree_count)]
         for tree in self.forest:
-            tree.fit(data, prediction_target, column_types)
+            if self.drop_data == 0:
+                tree.fit(data, prediction_target, column_types)
+            else:
+                ind = list(data.index)
+                np.random.shuffle(ind)
+                tree.fit(data.drop(ind[:self.drop_data]), prediction_target.drop(ind[:self.drop_data]), column_types)
 
     def predict(self, data):
         indexes = list(data.index)
