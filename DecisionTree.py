@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import random
+import math
 
 class DecisionTree:
     _description = 'A universal Decision Tree, accounting for all types of data and predictions.'
@@ -60,8 +61,18 @@ class DecisionTree:
     def _getFailureProbability(data):
         if len(data) == 0:
             return 1.0
+
         value_counts = data.value_counts().values
-        return 1.0 - max(value_counts) / sum(value_counts)
+        all_sum = sum(value_counts)
+        entropy = 0.0
+
+        for i in value_counts:
+            if i == 0:
+                continue
+            p = i / all_sum
+            entropy -= p * math.log2(p)
+
+        return entropy
 
 
     def _buildTree(self, v, data, prediction_target, column_types, unique_values, current_deapth):
