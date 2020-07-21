@@ -4,12 +4,6 @@ import random
 import math
 
 class DecisionTree:
-    _description = 'A universal Decision Tree, accounting for all types of data and predictions.'
-    
-    @property
-    def description(self):
-        return self._description
-
     def __init__(self, max_deapth = 30, min_gain = -0.00001, min_node_examples = 1, max_node_examples = 1000000000, feature_subset_volume = 1000000000, question_count = 50, seed = 610):
         self.max_node_examples = max_node_examples
         self.max_deapth = max_deapth
