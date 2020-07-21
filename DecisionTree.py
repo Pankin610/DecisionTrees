@@ -1,20 +1,24 @@
 import pandas as pd
 import numpy as np
+import random
 import math
 
-class DecisionTree:    
+class DecisionTree:
+    _description = 'A universal Decision Tree, accounting for all types of data and predictions.'
+    
     @property
     def description(self):
         return self._description
 
     def __init__(self, max_deapth = 30, min_gain = -0.00001, min_node_examples = 1, max_node_examples = 1000000000, feature_subset_volume = 1000000000, question_count = 50, seed = 610):
-        self._max_node_examples = max_node_examples
-        self._max_deapth = max_deapth
-        self._min_gain = min_gain
-        self._question_count = question_count
-        self._seed = seed
-        self._min_node_examples = min_node_examples
-        self._feature_subset_volume = feature_subset_volume
+        self.max_node_examples = max_node_examples
+        self.max_deapth = max_deapth
+        self.min_gain = min_gain
+        self.question_count = question_count
+        self.seed = seed
+        self.min_node_examples = min_node_examples
+        self.feature_subset_volume = feature_subset_volume
+        random.seed(seed)
         np.random.seed(seed)
 
     class _Question:
@@ -53,7 +57,8 @@ class DecisionTree:
                 raise KeyError("No question in a leaf node.")
             return self.__question.comparator(data[self.__question.column], self.__question.compared_value)
 
-    def _getEvaluation(self, data):
+    @staticmethod
+    def _getFailureProbability(data):
         if len(data) == 0:
             return 1.0
 
@@ -68,26 +73,24 @@ class DecisionTree:
             entropy -= p * math.log2(p)
 
         return entropy
-    def _getFinalAnswer(self, prediction_target):
-        return prediction_target.value_counts().idxmax()
 
 
     def _buildTree(self, v, data, prediction_target, column_types, unique_values, current_deapth):
-        max_gain = self._min_gain - 1.0
+        max_gain = self.min_gain - 1.0
         best_question = 1
 
-        current_failure_probability = self._getEvaluation(prediction_target)
+        current_failure_probability = DecisionTree._getFailureProbability(prediction_target)
 
-        if self._feature_subset_volume >= len(data.columns):
+        if self.feature_subset_volume >= len(data.columns):
             chosen_features = data.columns
         else:
             chosen_features = list(data.columns)
             np.random.shuffle(chosen_features)
-            chosen_features = chosen_features[self._feature_subset_volume:]
+            chosen_features = chosen_features[self.feature_subset_volume:]
 
         for feature in chosen_features:
-            if self._question_count < min(len(data), len(unique_values[feature])):
-                values = [data.iloc[i][feature] for i in np.random.randint(0, len(data), self._question_count)]
+            if self.question_count < min(len(data), len(unique_values[feature])):
+                values = [data.iloc[i][feature] for i in np.random.randint(0, len(data), self.question_count)]
             elif len(unique_values[feature]) > len(data):
                 values = data[feature].values
             else: 
@@ -100,18 +103,18 @@ class DecisionTree:
 
                 prediction_true  = prediction_target[list(map(lambda x : current_question(x, val), data[feature]))]
                 prediction_false = prediction_target[list(map(lambda x : not current_question(x, val), data[feature]))]
-                if min(len(prediction_true), len(prediction_false)) < self._min_node_examples:
+                if min(len(prediction_true), len(prediction_false)) < self.min_node_examples:
                     continue
 
-                new_failure_probability = (self._getEvaluation(prediction_true) * len(prediction_true) + 
-                                           self._getEvaluation(prediction_false) * len(prediction_false)) / len(data)
+                new_failure_probability = (DecisionTree._getFailureProbability(prediction_true) * len(prediction_true) + 
+                                           DecisionTree._getFailureProbability(prediction_false) * len(prediction_false)) / len(data)
                 
                 if current_failure_probability - new_failure_probability > max_gain:
                     max_gain = current_failure_probability - new_failure_probability
                     best_question = DecisionTree._Question(val, current_question, feature)
         
-        if max_gain < self._min_gain and len(data) <= self._max_node_examples or best_question == 1 or current_deapth == self._max_deapth and len(data) <= self._max_node_examples:
-            result = self._getFinalAnswer(prediction_target)
+        if max_gain < self.min_gain and len(data) <= self.max_node_examples or best_question == 1 or current_deapth == self.max_deapth and len(data) <= self.max_node_examples:
+            result = prediction_target.value_counts().idxmax()
             v.makeLeaf(result, current_failure_probability)
             return
 
@@ -206,36 +209,33 @@ class RandomForest(DecisionTree):
     def __init__(self, max_deapth = 30, min_gain = -0.00001, min_node_examples = 1, max_node_examples = 1000000000,
                  feature_subset_volume = 1000000000, question_count = 50, seed = 610, tree_count = 5, drop_data = 0):
 
-        self._max_node_examples = max_node_examples
-        self._max_deapth = max_deapth
-        self._min_gain = min_gain
-        self._question_count = question_count
-        self._seed = seed
-        self._min_node_examples = min_node_examples
-        self._feature_subset_volume = feature_subset_volume
-        self._tree_count = tree_count
-        self._drop_data = drop_data
+        self.max_node_examples = max_node_examples
+        self.max_deapth = max_deapth
+        self.min_gain = min_gain
+        self.question_count = question_count
+        self.seed = seed
+        self.min_node_examples = min_node_examples
+        self.feature_subset_volume = feature_subset_volume
+        self.tree_count = tree_count
+        self.drop_data = drop_data
+        random.seed(seed)
         np.random.seed(seed)
 
-    def _makeForest(self):
-        self._forest = [DecisionTree(max_deapth=self._max_deapth, min_gain=self._min_gain, min_node_examples=self._min_node_examples, max_node_examples=self._max_node_examples,
-                                    feature_subset_volume=self._feature_subset_volume, question_count = self._question_count, seed=self._seed) for i in range(self._tree_count)]
-
     def fit(self, data, prediction_target, column_types = {}):
-        self._makeForest()
-
-        for tree in self._forest:
-            if self._drop_data == 0:
+        self.forest = [DecisionTree(max_deapth=self.max_deapth, min_gain=self.min_gain, min_node_examples=self.min_node_examples, max_node_examples=self.max_node_examples,
+                                    feature_subset_volume=self.feature_subset_volume, question_count = self.question_count, seed=self.seed) for i in range(self.tree_count)]
+        for tree in self.forest:
+            if self.drop_data == 0:
                 tree.fit(data, prediction_target, column_types)
             else:
                 ind = list(data.index)
                 np.random.shuffle(ind)
-                tree.fit(data.drop(ind[:self._drop_data]), prediction_target.drop(ind[:self._drop_data]), column_types)
+                tree.fit(data.drop(ind[:self.drop_data]), prediction_target.drop(ind[:self.drop_data]), column_types)
 
     def predict(self, data):
         indexes = list(data.index)
         col = pd.Series([{} for i in range(len(data))], indexes)
-        for tree in self._forest:
+        for tree in self.forest:
             prediction = tree.predict(data)
             for i in indexes:
                 col.loc[i][prediction.loc[i]] = col.loc[i].get(prediction.loc[i], 0) + 1
@@ -244,24 +244,6 @@ class RandomForest(DecisionTree):
             prediction.loc[i] = max(zip(col.loc[i].values(), col.loc[i].keys()))[1]
         return prediction
         
-class DecisionTreeRegression(DecisionTree):
-    def _getEvaluation(self, data):
-        return data.std()
-    def _getFinalAnswer(self, prediction_target):
-        return prediction_target.mean()
 
-class RandomForestRegression(RandomForest):
-    def _makeForest(self):
-        self._forest = [ DecisionTreeRegression( max_deapth = self._max_deapth, min_gain = self._min_gain, min_node_examples = self._min_node_examples,
-                                                max_node_examples = self._max_node_examples, feature_subset_volume = self._feature_subset_volume, 
-                                                question_count = self._question_count, seed = self._seed ) for i in range(self._tree_count) ]
-    def predict(self, data):
-        indexes = list(data.index)
-        prediction = pd.Series([0] * len(indexes), indexes)
-        for tree in self._forest:
-            prediction += tree.predict(data)
-
-        for i in indexes:
-            prediction.loc[i] /= self._tree_count
-        return prediction
+            
     
